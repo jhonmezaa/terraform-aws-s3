@@ -1,0 +1,8 @@
+# =============================================================================
+# Example Terraform Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and customize the values
+
+aws_region   = "us-east-1"
+account_name = "dev"
+project_name = "myapp"
