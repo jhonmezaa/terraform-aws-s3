@@ -1,0 +1,8 @@
+# =============================================================================
+# Example Terraform Variables
+# =============================================================================
+
+aws_region   = "us-east-1"
+account_name = "prod"
+project_name = "mywebsite"
+domain_name  = "example.com" # Your actual domain for CORS
