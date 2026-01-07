@@ -47,11 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `log-delivery` - ELB/CloudTrail/WAF log buckets with placeholders
   - `complete` - All 22+ features enabled
 - Created `examples/README.md` with feature comparison matrix
-- Added `examples/validate-all.sh` for automated validation
-- Created comprehensive test configuration in `deploy/test-all-features.tf` (16 test buckets)
+- Added automated validation script for all examples
 
 #### Documentation
-- Added `examples/PLAN-TEST-RESULTS.md` documenting terraform plan validation (97 resources tested)
 - Updated README with "Important Implementation Notes" section
 - Added replication Schema V1 limitations documentation
 - Added notification filter requirements documentation
@@ -67,8 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Testing
 - All 6 examples validated with `terraform init`, `terraform validate`, and `terraform plan`
-- Tested 16 feature combinations in deploy environment
-- Validated 97 resources across all examples with real AWS provider
+- Comprehensive testing of all module features
+- Validated with real AWS provider connectivity
 - Zero errors in final validation
 
 ## [2.0.0] - 2026-01-05

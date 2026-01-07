@@ -439,7 +439,7 @@ buckets = {
 
 ## Migration from v1.x
 
-This is a **major version update** with breaking changes. See [MIGRATION.md](./MIGRATION.md) for the complete migration guide.
+This is a **major version update** with breaking changes.
 
 ### Key Breaking Changes
 
@@ -534,7 +534,7 @@ Contributions are welcome! Please open an issue or submit a pull request.
 For issues and questions:
 - Open an issue on GitHub
 - Review the [examples/](./examples/) directory
-- Check [MIGRATION.md](./MIGRATION.md) for upgrade guidance
+- Check [CHANGELOG.md](./CHANGELOG.md) for upgrade guidance
 
 ## Resources
 
