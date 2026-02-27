@@ -4,7 +4,7 @@
 # Demonstrates cross-region replication for disaster recovery and compliance
 
 terraform {
-  required_version = ">= 1.0"
+  required_version = "~> 1.0"
 
   required_providers {
     aws = {
