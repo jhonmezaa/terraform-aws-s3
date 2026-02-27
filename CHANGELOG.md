@@ -1,5 +1,11 @@
 # Changelog
 
+## [v2.0.3] - 2026-02-27
+
+### Changed
+- Standardize Terraform `required_version` to `~> 1.0` across module and examples
+
+
 ## [v2.0.2] - 2026-02-27
 
 ### Changed
