@@ -193,7 +193,7 @@ locals {
   # Buckets requiring bucket policy (any policy type)
   buckets_with_any_policy = {
     for k, v in var.buckets :
-    k => v if (
+    k => v if(
       v.create_bucket_policy ||
       v.attach_elb_log_policy ||
       v.attach_lb_log_policy ||
@@ -242,8 +242,8 @@ locals {
     for bucket_key, bucket in var.buckets : {
       for config_key, config in bucket.inventory_configs :
       "${bucket_key}-${config_key}" => merge(config, {
-        bucket_key               = bucket_key
-        destination_bucket_arn   = config.destination_bucket
+        bucket_key                  = bucket_key
+        destination_bucket_arn      = config.destination_bucket
         destination_encryption_type = config.destination_encryption_type == "SSE-S3" ? "sse_s3" : config.destination_encryption_type == "SSE-KMS" ? "sse_kms" : null
       })
     } if length(bucket.inventory_configs) > 0
@@ -254,11 +254,11 @@ locals {
     for bucket_key, bucket in var.buckets : {
       for config_key, config in bucket.analytics_configs :
       "${bucket_key}-${config_key}" => merge(config, {
-        bucket_key                      = bucket_key
-        export_destination_bucket_arn   = config.storage_class_analysis_data_export_destination_bucket
-        export_destination_prefix       = config.storage_class_analysis_data_export_destination_prefix
-        export_encryption_type          = null # Not supported in analytics export
-        export_kms_key_id               = null # Not supported in analytics export
+        bucket_key                    = bucket_key
+        export_destination_bucket_arn = config.storage_class_analysis_data_export_destination_bucket
+        export_destination_prefix     = config.storage_class_analysis_data_export_destination_prefix
+        export_encryption_type        = null # Not supported in analytics export
+        export_kms_key_id             = null # Not supported in analytics export
       })
     } if length(bucket.analytics_configs) > 0
   ]...)
@@ -268,7 +268,7 @@ locals {
     for bucket_key, bucket in var.buckets : {
       for config_key, config in bucket.metrics_configs :
       "${bucket_key}-${config_key}" => merge(config, {
-        bucket_key             = bucket_key
+        bucket_key              = bucket_key
         filter_access_point_arn = null # Add if needed in future
       })
     } if length(bucket.metrics_configs) > 0

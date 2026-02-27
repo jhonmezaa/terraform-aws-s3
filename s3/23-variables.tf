@@ -27,10 +27,10 @@ variable "buckets" {
     # -------------------------------------------------------------------------
     # Server-Side Encryption
     # -------------------------------------------------------------------------
-    enable_encryption  = optional(bool, true)      # Enable encryption (default: true for security)
+    enable_encryption  = optional(bool, true)       # Enable encryption (default: true for security)
     encryption_type    = optional(string, "AES256") # "AES256" (SSE-S3) or "aws:kms" (SSE-KMS)
-    kms_key_id         = optional(string, null)    # KMS key ID/ARN (required if encryption_type = "aws:kms")
-    bucket_key_enabled = optional(bool, true)      # Use S3 Bucket Keys (reduces KMS costs)
+    kms_key_id         = optional(string, null)     # KMS key ID/ARN (required if encryption_type = "aws:kms")
+    bucket_key_enabled = optional(bool, true)       # Use S3 Bucket Keys (reduces KMS costs)
 
     # -------------------------------------------------------------------------
     # Advanced Lifecycle Rules
@@ -58,8 +58,8 @@ variable "buckets" {
       })), [])
 
       # Expiration
-      expiration_days                      = optional(number, null)
-      expiration_date                      = optional(string, null)
+      expiration_days                         = optional(number, null)
+      expiration_date                         = optional(string, null)
       expiration_expired_object_delete_marker = optional(bool, false)
 
       # Noncurrent version expiration
@@ -125,10 +125,10 @@ variable "buckets" {
         filter_tags   = optional(map(string), null)
 
         # Destination
-        destination_bucket                 = string                       # ARN of destination bucket
-        destination_storage_class          = optional(string, "STANDARD") # Storage class in destination
-        destination_account_id             = optional(string, null)       # Cross-account replication
-        destination_replica_kms_key_id     = optional(string, null)       # KMS key for replica encryption
+        destination_bucket             = string                       # ARN of destination bucket
+        destination_storage_class      = optional(string, "STANDARD") # Storage class in destination
+        destination_account_id         = optional(string, null)       # Cross-account replication
+        destination_replica_kms_key_id = optional(string, null)       # KMS key for replica encryption
         destination_access_control_translation = optional(object({
           owner = string # Destination (change ownership to destination account)
         }), null)
@@ -184,11 +184,11 @@ variable "buckets" {
       frequency = string # Daily or Weekly
 
       # Destination
-      destination_bucket          = string               # ARN of destination bucket
-      destination_prefix          = optional(string, "") # Prefix for inventory reports
-      destination_format          = optional(string, "ORC")      # ORC, Parquet, CSV
+      destination_bucket          = string                  # ARN of destination bucket
+      destination_prefix          = optional(string, "")    # Prefix for inventory reports
+      destination_format          = optional(string, "ORC") # ORC, Parquet, CSV
       destination_account_id      = optional(string, null)
-      destination_encryption_type = optional(string, null)       # SSE-S3 or SSE-KMS
+      destination_encryption_type = optional(string, null) # SSE-S3 or SSE-KMS
       destination_kms_key_id      = optional(string, null)
 
       # Optional fields to include in report
@@ -272,12 +272,12 @@ variable "buckets" {
     # -------------------------------------------------------------------------
     # Bucket Policy
     # -------------------------------------------------------------------------
-    create_bucket_policy       = optional(bool, true)  # Create default TLS-enforcing policy
-    attach_elb_log_policy      = optional(bool, false) # Allow ELB log delivery
-    attach_lb_log_policy       = optional(bool, false) # Alias for attach_elb_log_policy
-    attach_cloudtrail_policy   = optional(bool, false) # Allow CloudTrail log delivery
-    attach_waf_log_policy      = optional(bool, false) # Allow WAF log delivery
-    custom_policy_statements   = optional(string, null) # Custom policy JSON
+    create_bucket_policy     = optional(bool, true)   # Create default TLS-enforcing policy
+    attach_elb_log_policy    = optional(bool, false)  # Allow ELB log delivery
+    attach_lb_log_policy     = optional(bool, false)  # Alias for attach_elb_log_policy
+    attach_cloudtrail_policy = optional(bool, false)  # Allow CloudTrail log delivery
+    attach_waf_log_policy    = optional(bool, false)  # Allow WAF log delivery
+    custom_policy_statements = optional(string, null) # Custom policy JSON
 
     # -------------------------------------------------------------------------
     # Public Access Block
