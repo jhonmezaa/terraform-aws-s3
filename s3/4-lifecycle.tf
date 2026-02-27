@@ -36,7 +36,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
           for_each = (
             (rule.value.filter_tags != null ||
               rule.value.filter_object_size_greater_than != null ||
-              rule.value.filter_object_size_less_than != null) &&
+            rule.value.filter_object_size_less_than != null) &&
             rule.value.filter_prefix != null
           ) ? [1] : []
 

@@ -332,21 +332,21 @@ output "buckets_summary" {
   description = "Comprehensive summary of all bucket configurations"
   value = {
     for k, v in aws_s3_bucket.this : k => {
-      id                     = v.id
-      arn                    = v.arn
-      region                 = v.region
-      domain_name            = v.bucket_domain_name
-      versioning_enabled     = contains(keys(aws_s3_bucket_versioning.this), k)
-      encryption_enabled     = contains(keys(aws_s3_bucket_server_side_encryption_configuration.this), k)
-      website_enabled        = contains(keys(aws_s3_bucket_website_configuration.this), k)
-      logging_enabled        = contains(keys(aws_s3_bucket_logging.this), k)
-      replication_enabled    = contains(keys(aws_s3_bucket_replication_configuration.this), k)
-      acceleration_enabled   = contains(keys(aws_s3_bucket_accelerate_configuration.this), k)
-      object_lock_enabled    = v.object_lock_enabled
-      public_access_blocked  = contains(keys(aws_s3_bucket_public_access_block.this), k)
-      policy_attached        = contains(keys(aws_s3_bucket_policy.this), k)
-      lifecycle_rules_count  = length(lookup(var.buckets[k], "lifecycle_rules", {}))
-      cors_rules_count       = length(lookup(var.buckets[k], "cors_rules", []))
+      id                    = v.id
+      arn                   = v.arn
+      region                = v.region
+      domain_name           = v.bucket_domain_name
+      versioning_enabled    = contains(keys(aws_s3_bucket_versioning.this), k)
+      encryption_enabled    = contains(keys(aws_s3_bucket_server_side_encryption_configuration.this), k)
+      website_enabled       = contains(keys(aws_s3_bucket_website_configuration.this), k)
+      logging_enabled       = contains(keys(aws_s3_bucket_logging.this), k)
+      replication_enabled   = contains(keys(aws_s3_bucket_replication_configuration.this), k)
+      acceleration_enabled  = contains(keys(aws_s3_bucket_accelerate_configuration.this), k)
+      object_lock_enabled   = v.object_lock_enabled
+      public_access_blocked = contains(keys(aws_s3_bucket_public_access_block.this), k)
+      policy_attached       = contains(keys(aws_s3_bucket_policy.this), k)
+      lifecycle_rules_count = length(lookup(var.buckets[k], "lifecycle_rules", {}))
+      cors_rules_count      = length(lookup(var.buckets[k], "cors_rules", []))
     }
   }
 }
