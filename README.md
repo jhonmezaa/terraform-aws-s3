@@ -5,12 +5,14 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 ## Features
 
 ### Core Features
+
 - ✅ **Bucket Management**: Auto-naming with region prefix detection
 - ✅ **Versioning**: With MFA delete support
 - ✅ **Encryption**: SSE-S3 (AES256) and SSE-KMS with bucket keys
 - ✅ **Public Access Block**: All 4 independent settings
 
 ### Lifecycle Management
+
 - ✅ **Advanced Lifecycle Rules**: Multiple rules per bucket
 - ✅ **Storage Class Transitions**: STANDARD → STANDARD_IA → GLACIER_IR → GLACIER → DEEP_ARCHIVE
 - ✅ **Noncurrent Version Management**: Automatic cleanup of old versions
@@ -19,6 +21,7 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 - ✅ **Advanced Filtering**: Prefix, tags, object size (greater/less than)
 
 ### Access & Security
+
 - ✅ **Bucket Policies**: TLS enforcement, ELB/CloudTrail/WAF log delivery
 - ✅ **Custom Policies with Placeholders**: Auto-replacement of {{BUCKET_ID}}, {{BUCKET_ARN}}, {{ACCOUNT_ID}}, {{REGION}}
 - ✅ **Object Ownership Controls**: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter
@@ -26,16 +29,19 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 - ✅ **Request Payment**: Requester pays option
 
 ### Website & CORS
+
 - ✅ **Static Website Hosting**: Index/error documents, redirects, routing rules
 - ✅ **CORS Configuration**: Multiple rules with origin/method filtering
 
 ### Logging & Monitoring
+
 - ✅ **Access Logging**: Server access logs
 - ✅ **Request Metrics**: CloudWatch metrics with filtering
 - ✅ **Analytics**: Storage class analysis
 - ✅ **Inventory**: Scheduled inventory reports (CSV/ORC/Parquet)
 
 ### Advanced Features
+
 - ✅ **Cross-Region Replication**: Schema V1 (basic) - single rule, maximum compatibility
 - ✅ **Transfer Acceleration**: CloudFront edge location optimization
 - ✅ **Object Lock**: COMPLIANCE and GOVERNANCE modes
@@ -44,10 +50,10 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 
 ## Requirements
 
-| Name | Version |
-|------|---------|
-| terraform | >= 1.0 |
-| aws | >= 5.0 |
+| Name      | Version |
+| --------- | ------- |
+| terraform | >= 1.0  |
+| aws       | >= 5.0  |
 
 ## Quick Start
 
@@ -84,6 +90,7 @@ module "s3_buckets" {
 ## Usage Examples
 
 ### Basic Bucket with Defaults
+
 ```hcl
 buckets = {
   basic = {
@@ -93,6 +100,7 @@ buckets = {
 ```
 
 ### Bucket with Advanced Lifecycle
+
 ```hcl
 buckets = {
   archive = {
@@ -117,6 +125,7 @@ buckets = {
 ```
 
 ### Static Website Hosting
+
 ```hcl
 buckets = {
   website = {
@@ -146,6 +155,7 @@ buckets = {
 ```
 
 ### Log Delivery Buckets
+
 ```hcl
 buckets = {
   elb-logs = {
@@ -174,6 +184,7 @@ buckets = {
 ```
 
 ### Cross-Region Replication
+
 ```hcl
 buckets = {
   source = {
@@ -242,6 +253,7 @@ buckets = {
 ```
 
 **Available placeholders:**
+
 - `{{BUCKET_ID}}` → Actual bucket name (e.g., `ause1-s3-prod-myapp-app-logs`)
 - `{{BUCKET_ARN}}` → Bucket ARN (e.g., `arn:aws:s3:::ause1-s3-prod-myapp-app-logs`)
 - `{{ACCOUNT_ID}}` → AWS Account ID (e.g., `123456789012`)
@@ -254,6 +266,7 @@ Placeholders are replaced at apply time automatically. See [log-delivery example
 ⚠️ **Important:** This module uses S3 Replication **Schema V1** (basic) for maximum compatibility across all AWS accounts.
 
 **What works (Schema V1):**
+
 - ✅ Single replication rule per bucket
 - ✅ Cross-Region Replication (CRR) or Same-Region Replication (SRR)
 - ✅ Destination bucket and storage class configuration
@@ -261,6 +274,7 @@ Placeholders are replaced at apply time automatically. See [log-delivery example
 - ✅ Prefix filtering (one rule)
 
 **What doesn't work (Schema V2 - not universally available):**
+
 - ❌ Multiple replication rules with priority
 - ❌ Delete marker replication
 - ❌ Replication metrics
@@ -269,6 +283,7 @@ Placeholders are replaced at apply time automatically. See [log-delivery example
 **Why Schema V1?** During extensive testing, we found that Schema V2 features (`priority`, `delete_marker_replication`) cause `InvalidRequest` API errors even when properly configured, indicating they're not universally available across all AWS accounts/regions.
 
 **Example:**
+
 ```hcl
 buckets = {
   source = {
@@ -299,6 +314,7 @@ See [with-replication example](./examples/with-replication/) for working impleme
 **AWS will reject configurations with ambiguous/overlapping notification rules.**
 
 ❌ **Bad - Will fail:**
+
 ```hcl
 notifications = {
   lambda_functions = {
@@ -318,6 +334,7 @@ notifications = {
 ```
 
 ✅ **Good - Non-overlapping:**
+
 ```hcl
 notifications = {
   lambda_functions = {
@@ -337,6 +354,7 @@ notifications = {
 ```
 
 **Best practices:**
+
 - Use unique prefix/suffix combinations for each rule
 - Use different event types when possible (Created vs Removed)
 - Always specify filter_prefix to avoid wildcards
@@ -349,33 +367,33 @@ For complete input documentation, see [variables.tf](./s3/23-variables.tf).
 
 ### Key Variables
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|----------|
-| `create` | Whether to create resources | `bool` | `true` | no |
-| `account_name` | Account name for bucket naming | `string` | n/a | yes |
-| `project_name` | Project name for bucket naming | `string` | n/a | yes |
-| `region_prefix` | Region prefix override (auto-detected if null) | `string` | `null` | no |
-| `buckets` | Map of bucket configurations | `map(object)` | `{}` | no |
-| `tags_common` | Common tags for all buckets | `map(string)` | `{}` | no |
+| Name            | Description                                    | Type          | Default | Required |
+| --------------- | ---------------------------------------------- | ------------- | ------- | -------- |
+| `create`        | Whether to create resources                    | `bool`        | `true`  | no       |
+| `account_name`  | Account name for bucket naming                 | `string`      | n/a     | yes      |
+| `project_name`  | Project name for bucket naming                 | `string`      | n/a     | yes      |
+| `region_prefix` | Region prefix override (auto-detected if null) | `string`      | `null`  | no       |
+| `buckets`       | Map of bucket configurations                   | `map(object)` | `{}`    | no       |
+| `tags_common`   | Common tags for all buckets                    | `map(string)` | `{}`    | no       |
 
 ### Bucket Configuration Object
 
 Each bucket in the `buckets` map supports 100+ configuration options. Key options:
 
-| Option | Description | Type | Default |
-|--------|-------------|------|---------|
-| `force_destroy` | Allow bucket deletion with objects | `bool` | `false` |
-| `enable_versioning` | Enable versioning | `bool` | `true` |
-| `enable_encryption` | Enable encryption | `bool` | `true` |
-| `encryption_type` | SSE algorithm (AES256 or aws:kms) | `string` | `"AES256"` |
-| `enable_public_access_block` | Block public access | `bool` | `true` |
-| `create_bucket_policy` | Create TLS enforcement policy | `bool` | `true` |
-| `lifecycle_rules` | Map of lifecycle rules | `map(object)` | `{}` |
-| `cors_rules` | List of CORS rules | `list(object)` | `[]` |
-| `enable_website` | Enable website hosting | `bool` | `false` |
-| `enable_replication` | Enable replication | `bool` | `false` |
-| `enable_acceleration` | Enable transfer acceleration | `bool` | `false` |
-| `object_lock_enabled` | Enable object lock (immutable at creation) | `bool` | `false` |
+| Option                       | Description                                | Type           | Default    |
+| ---------------------------- | ------------------------------------------ | -------------- | ---------- |
+| `force_destroy`              | Allow bucket deletion with objects         | `bool`         | `false`    |
+| `enable_versioning`          | Enable versioning                          | `bool`         | `true`     |
+| `enable_encryption`          | Enable encryption                          | `bool`         | `true`     |
+| `encryption_type`            | SSE algorithm (AES256 or aws:kms)          | `string`       | `"AES256"` |
+| `enable_public_access_block` | Block public access                        | `bool`         | `true`     |
+| `create_bucket_policy`       | Create TLS enforcement policy              | `bool`         | `true`     |
+| `lifecycle_rules`            | Map of lifecycle rules                     | `map(object)`  | `{}`       |
+| `cors_rules`                 | List of CORS rules                         | `list(object)` | `[]`       |
+| `enable_website`             | Enable website hosting                     | `bool`         | `false`    |
+| `enable_replication`         | Enable replication                         | `bool`         | `false`    |
+| `enable_acceleration`        | Enable transfer acceleration               | `bool`         | `false`    |
+| `object_lock_enabled`        | Enable object lock (immutable at creation) | `bool`         | `false`    |
 
 See [complete example](./examples/complete/) for all available options.
 
@@ -383,22 +401,23 @@ See [complete example](./examples/complete/) for all available options.
 
 27+ comprehensive outputs are provided. Key outputs:
 
-| Name | Description |
-|------|-------------|
-| `bucket_ids` | Map of bucket keys to IDs (names) |
-| `bucket_arns` | Map of bucket keys to ARNs |
-| `bucket_domain_names` | Map of bucket keys to domain names |
-| `website_endpoints` | Map of bucket keys to website endpoints |
-| `versioning_enabled` | Map of bucket keys to versioning status |
-| `encryption_enabled` | Map of bucket keys to encryption status |
+| Name                     | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `bucket_ids`             | Map of bucket keys to IDs (names)           |
+| `bucket_arns`            | Map of bucket keys to ARNs                  |
+| `bucket_domain_names`    | Map of bucket keys to domain names          |
+| `website_endpoints`      | Map of bucket keys to website endpoints     |
+| `versioning_enabled`     | Map of bucket keys to versioning status     |
+| `encryption_enabled`     | Map of bucket keys to encryption status     |
 | `acceleration_endpoints` | Map of bucket keys to accelerated endpoints |
-| `buckets_summary` | Comprehensive summary of all configurations |
+| `buckets_summary`        | Comprehensive summary of all configurations |
 
 See [outputs.tf](./s3/24-outputs.tf) for all available outputs.
 
 ## Bucket Naming Convention
 
 Buckets are automatically named using the pattern:
+
 ```
 {region_prefix}-s3-{account_name}-{project_name}-{bucket_key}
 ```
@@ -409,12 +428,12 @@ Buckets are automatically named using the pattern:
 
 The module automatically detects the AWS region and applies the appropriate prefix:
 
-| Region | Prefix | Region | Prefix |
-|--------|--------|--------|--------|
-| us-east-1 | ause1 | eu-west-1 | euw1 |
-| us-east-2 | ause2 | eu-west-2 | euw2 |
-| us-west-1 | usw1 | eu-west-3 | euw3 |
-| us-west-2 | usw2 | ap-southeast-1 | apse1 |
+| Region    | Prefix | Region         | Prefix |
+| --------- | ------ | -------------- | ------ |
+| us-east-1 | ause1  | eu-west-1      | euw1   |
+| us-east-2 | ause2  | eu-west-2      | euw2   |
+| us-west-1 | usw1   | eu-west-3      | euw3   |
+| us-west-2 | usw2   | ap-southeast-1 | apse1  |
 
 27 regions supported. Override with `region_prefix` variable if needed.
 
@@ -429,6 +448,7 @@ The module implements security best practices by default:
 - ✅ **Object Ownership**: BucketOwnerEnforced (disables ACLs)
 
 To disable any default, explicitly set to `false`:
+
 ```hcl
 buckets = {
   example = {
@@ -502,6 +522,7 @@ The module includes features for cost optimization:
 ## Testing
 
 ### Validate Configuration
+
 ```bash
 cd s3/
 terraform init
@@ -509,6 +530,7 @@ terraform validate
 ```
 
 ### Test Examples
+
 ```bash
 cd examples/simple/
 terraform init
@@ -532,6 +554,7 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## Support
 
 For issues and questions:
+
 - Open an issue on GitHub
 - Review the [examples/](./examples/) directory
 - Check [CHANGELOG.md](./CHANGELOG.md) for upgrade guidance
