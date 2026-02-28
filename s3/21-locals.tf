@@ -54,6 +54,9 @@ locals {
     "unknown"
   )
 
+  # Name prefix: includes region prefix with trailing dash, or empty string
+  name_prefix = var.use_region_prefix ? "${local.region_prefix}-" : ""
+
   # ---------------------------------------------------------------------------
   # Bucket Naming
   # ---------------------------------------------------------------------------
@@ -63,7 +66,7 @@ locals {
 
   bucket_names = {
     for k, v in var.buckets :
-    k => "${local.region_prefix}-s3-${var.account_name}-${var.project_name}-${k}"
+    k => "${local.name_prefix}s3-${var.account_name}-${var.project_name}-${k}"
   }
 
   # ---------------------------------------------------------------------------
@@ -324,7 +327,7 @@ locals {
         ),
         "{{ACCOUNT_ID}}", data.aws_caller_identity.current.account_id
       ),
-      "{{REGION}}", data.aws_region.current.name
+      "{{REGION}}", data.aws_region.current.id
     ) : null
   }
 }

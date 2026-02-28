@@ -134,7 +134,7 @@ data "aws_iam_policy_document" "combined" {
       condition {
         test     = "StringEquals"
         variable = "aws:SourceArn"
-        values   = ["arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/*"]
+        values   = ["arn:aws:cloudtrail:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:trail/*"]
       }
     }
   }
@@ -168,7 +168,7 @@ data "aws_iam_policy_document" "combined" {
       condition {
         test     = "StringEquals"
         variable = "aws:SourceArn"
-        values   = ["arn:aws:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/*"]
+        values   = ["arn:aws:cloudtrail:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:trail/*"]
       }
     }
   }

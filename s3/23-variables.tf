@@ -403,6 +403,12 @@ variable "region_prefix" {
   default     = null
 }
 
+variable "use_region_prefix" {
+  description = "Whether to include the region prefix in resource names. When false, names omit the region prefix."
+  type        = bool
+  default     = true
+}
+
 variable "tags_common" {
   description = "Common tags to apply to all S3 buckets in addition to bucket-specific tags"
   type        = map(string)
