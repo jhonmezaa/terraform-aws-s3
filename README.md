@@ -52,8 +52,8 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 
 | Name      | Version |
 | --------- | ------- |
-| terraform | >= 1.0  |
-| aws       | >= 5.0  |
+| terraform | >= 1.3  |
+| aws       | >= 6.0  |
 
 ## Quick Start
 
