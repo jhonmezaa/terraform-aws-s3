@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [v2.1.4] - 2026-10-27
+
+### Fixed
+
+- Replace deprecated `data.aws_region.current.id` with `data.aws_region.current.region` (deprecated in AWS provider v6) in module locals and bucket policy CloudTrail conditions
+
+### Changed
+
+- Stop tracking `.terraform.lock.hcl` files (module and examples) and add `.terraform.lock.hcl` to `.gitignore`
+
 ## [v2.1.3] - 2026-10-27
 
 ### Changed
