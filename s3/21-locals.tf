@@ -50,7 +50,7 @@ locals {
   # Auto-detect region prefix or use override
   region_prefix = var.region_prefix != null ? var.region_prefix : lookup(
     local.region_prefix_map,
-    data.aws_region.current.id,
+    data.aws_region.current.region,
     "unknown"
   )
 
@@ -327,7 +327,7 @@ locals {
         ),
         "{{ACCOUNT_ID}}", data.aws_caller_identity.current.account_id
       ),
-      "{{REGION}}", data.aws_region.current.id
+      "{{REGION}}", data.aws_region.current.region
     ) : null
   }
 }
