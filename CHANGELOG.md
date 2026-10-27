@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.5] - 2026-10-27
+
+### Changed
+
+- Normalize CHANGELOG: preamble moved to the top, all headings use the `## [vX.Y.Z] - YYYY-MM-DD` format, entries sorted by version (newest first)
+- Add missing entries for v2.1.0 and v2.1.1, reconstructed from git history
+
 ## [v2.1.4] - 2026-10-27
 
 ### Fixed
@@ -29,6 +36,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update README documentation and CHANGELOG formatting
+
+## [v2.1.1] - 2026-02-28
+
+### Changed
+
+- Update README documentation
+
+## [v2.1.0] - 2026-02-28
+
+### Added
+
+- `use_region_prefix` variable to toggle the region prefix in bucket names
+- `name_prefix` local for consistent prefix handling
+
+### Fixed
+
+- Replace deprecated `data.aws_region.current.name` with `.id` in locals and bucket policy
 
 ## [v2.0.3] - 2026-02-27
 
