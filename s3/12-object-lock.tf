@@ -28,11 +28,9 @@ resource "aws_s3_bucket_object_lock_configuration" "this" {
         # - COMPLIANCE: Cannot be removed by anyone, including root account
         mode = each.value.object_lock_config.rule_default_retention_mode
 
-        # Retention period in days
-        days = each.value.object_lock_config.rule_default_retention_days
-
-        # Alternative: specify years instead of days
-        # years = each.value.object_lock_config.rule_default_retention_years
+        # Retention period: days or years (AWS accepts only one; days wins)
+        days  = each.value.object_lock_config.rule_default_retention_days
+        years = each.value.object_lock_config.rule_default_retention_days == null ? each.value.object_lock_config.rule_default_retention_years : null
       }
     }
   }

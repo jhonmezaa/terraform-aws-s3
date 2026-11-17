@@ -58,15 +58,28 @@ locals {
   name_prefix = var.use_region_prefix ? "${local.region_prefix}-" : ""
 
   # ---------------------------------------------------------------------------
+  # Effective bucket map
+  # ---------------------------------------------------------------------------
+  # Every resource and data source iterates this map (never var.buckets
+  # directly) so that create = false disables the whole module consistently.
+
+  buckets = var.create ? var.buckets : {}
+
+  partition  = data.aws_partition.current.partition
+  account_id = data.aws_caller_identity.current.account_id
+  region     = data.aws_region.current.region
+
+  # ---------------------------------------------------------------------------
   # Bucket Naming
   # ---------------------------------------------------------------------------
   # Generate bucket names using pattern:
   # {region_prefix}-s3-{account_name}-{project_name}-{key}
   # Example: ause1-s3-prod-myapp-data
+  # An explicit per-bucket `name` overrides the generated name.
 
   bucket_names = {
-    for k, v in var.buckets :
-    k => "${local.name_prefix}s3-${var.account_name}-${var.project_name}-${k}"
+    for k, v in local.buckets :
+    k => coalesce(v.name, "${local.name_prefix}s3-${var.account_name}-${var.project_name}-${k}")
   }
 
   # ---------------------------------------------------------------------------
@@ -77,85 +90,85 @@ locals {
 
   # Buckets with versioning enabled
   buckets_with_versioning = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_versioning
   }
 
   # Buckets with encryption enabled
   buckets_with_encryption = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_encryption
   }
 
   # Buckets with public access block enabled
   buckets_with_public_access_block = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_public_access_block
   }
 
   # Buckets with website hosting enabled
   buckets_with_website = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_website && v.website_config != null
   }
 
   # Buckets with CORS rules
   buckets_with_cors = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.cors_rules) > 0
   }
 
   # Buckets with logging enabled
   buckets_with_logging = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_logging && v.logging_config != null
   }
 
   # Buckets with transfer acceleration enabled
   buckets_with_acceleration = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_acceleration
   }
 
   # Buckets with replication enabled
   buckets_with_replication = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.enable_replication && v.replication_config != null
   }
 
   # Buckets with object lock enabled
   buckets_with_object_lock = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.object_lock_enabled
   }
 
   # Buckets with object lock configuration (retention rules)
   buckets_with_object_lock_config = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.object_lock_enabled && v.object_lock_config != null
   }
 
   # Buckets with ownership controls
   buckets_with_ownership_controls = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.object_ownership != null
   }
 
   # Buckets with ACL (only when ownership != BucketOwnerEnforced)
   buckets_with_acl = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.acl != null && v.object_ownership != "BucketOwnerEnforced"
   }
 
   # Buckets with request payment
   buckets_with_request_payment = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.request_payer != "BucketOwner"
   }
 
   # Buckets with notifications enabled
   buckets_with_notifications = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.notifications != null && (
       length(try(v.notifications.sns_topics, {})) > 0 ||
       length(try(v.notifications.sqs_queues, {})) > 0 ||
@@ -166,25 +179,25 @@ locals {
 
   # Buckets requiring intelligent tiering configurations
   buckets_with_intelligent_tiering = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.intelligent_tiering_configs) > 0
   }
 
   # Buckets with inventory configurations
   buckets_with_inventory = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.inventory_configs) > 0
   }
 
   # Buckets with analytics configurations
   buckets_with_analytics = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.analytics_configs) > 0
   }
 
   # Buckets with metrics configurations
   buckets_with_metrics = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.metrics_configs) > 0
   }
 
@@ -195,34 +208,73 @@ locals {
 
   # Buckets requiring bucket policy (any policy type)
   buckets_with_any_policy = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if(
       v.create_bucket_policy ||
       v.attach_elb_log_policy ||
       v.attach_lb_log_policy ||
       v.attach_cloudtrail_policy ||
       v.attach_waf_log_policy ||
+      v.attach_lb_log_delivery_policy ||
+      v.attach_access_log_delivery_policy ||
+      v.attach_require_latest_tls_policy ||
+      v.attach_deny_unencrypted_object_uploads ||
+      v.attach_deny_ssec_encrypted_object_uploads ||
       v.custom_policy_statements != null
     )
   }
 
   # Buckets with ELB/ALB/NLB log delivery policy
   buckets_with_elb_policy = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.attach_elb_log_policy || v.attach_lb_log_policy
   }
 
   # Buckets with CloudTrail log delivery policy
   buckets_with_cloudtrail_policy = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.attach_cloudtrail_policy
   }
 
   # Buckets with WAF log delivery policy
   buckets_with_waf_policy = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if v.attach_waf_log_policy
   }
+
+  # Legacy ELB service accounts per region (regions created before August 2022).
+  # Newer regions only use the logdelivery.elasticloadbalancing.amazonaws.com
+  # service principal. Source: AWS ELB access logging documentation.
+  elb_service_accounts = {
+    us-east-1      = "127311923021"
+    us-east-2      = "033677994240"
+    us-west-1      = "027434742980"
+    us-west-2      = "797873946194"
+    af-south-1     = "098369216593"
+    ap-east-1      = "754344448648"
+    ap-south-1     = "718504428378"
+    ap-northeast-1 = "582318560864"
+    ap-northeast-2 = "600734575887"
+    ap-northeast-3 = "383597477331"
+    ap-southeast-1 = "114774131450"
+    ap-southeast-2 = "783225319266"
+    ap-southeast-3 = "589379963580"
+    ca-central-1   = "985666609251"
+    eu-central-1   = "054676820928"
+    eu-west-1      = "156460612806"
+    eu-west-2      = "652711504416"
+    eu-west-3      = "009996457667"
+    eu-south-1     = "635631232127"
+    eu-north-1     = "897822967062"
+    me-south-1     = "076674570225"
+    sa-east-1      = "507241528517"
+    us-gov-west-1  = "048591011584"
+    us-gov-east-1  = "190560391635"
+    cn-north-1     = "638102146993"
+    cn-northwest-1 = "037604701340"
+  }
+
+  elb_service_account_arn = contains(keys(local.elb_service_accounts), local.region) ? "arn:${local.partition}:iam::${local.elb_service_accounts[local.region]}:root" : null
 
   # ---------------------------------------------------------------------------
   # Flattened Configuration Maps
@@ -232,7 +284,7 @@ locals {
 
   # Flatten intelligent tiering configurations
   flattened_intelligent_tiering_configs = merge([
-    for bucket_key, bucket in var.buckets : {
+    for bucket_key, bucket in local.buckets : {
       for config_key, config in bucket.intelligent_tiering_configs :
       "${bucket_key}-${config_key}" => merge(config, {
         bucket_key = bucket_key
@@ -242,7 +294,7 @@ locals {
 
   # Flatten inventory configurations
   flattened_inventory_configs = merge([
-    for bucket_key, bucket in var.buckets : {
+    for bucket_key, bucket in local.buckets : {
       for config_key, config in bucket.inventory_configs :
       "${bucket_key}-${config_key}" => merge(config, {
         bucket_key                  = bucket_key
@@ -254,7 +306,7 @@ locals {
 
   # Flatten analytics configurations
   flattened_analytics_configs = merge([
-    for bucket_key, bucket in var.buckets : {
+    for bucket_key, bucket in local.buckets : {
       for config_key, config in bucket.analytics_configs :
       "${bucket_key}-${config_key}" => merge(config, {
         bucket_key                    = bucket_key
@@ -268,7 +320,7 @@ locals {
 
   # Flatten metrics configurations
   flattened_metrics_configs = merge([
-    for bucket_key, bucket in var.buckets : {
+    for bucket_key, bucket in local.buckets : {
       for config_key, config in bucket.metrics_configs :
       "${bucket_key}-${config_key}" => merge(config, {
         bucket_key              = bucket_key
@@ -280,20 +332,23 @@ locals {
   # ---------------------------------------------------------------------------
   # Combined Tags
   # ---------------------------------------------------------------------------
-  # Merge common tags with bucket-specific tags
-  # Adds default tags for Name, BucketKey, AccountName, ProjectName
+  # merge(tags_common, <specific tags>, { Name, ManagedBy })
+  # Name and ManagedBy always win so every bucket is tagged consistently.
 
   bucket_tags = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => merge(
       var.tags_common,
       {
-        Name        = local.bucket_names[k]
         BucketKey   = k
         AccountName = var.account_name
         ProjectName = var.project_name
       },
-      v.tags
+      v.tags,
+      {
+        Name      = local.bucket_names[k]
+        ManagedBy = "Terraform"
+      }
     )
   }
 
@@ -315,7 +370,7 @@ locals {
   # This allows users to write policies without calculating bucket names
 
   custom_policies_with_placeholders = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v.custom_policy_statements != null ? replace(
       replace(
         replace(
@@ -323,11 +378,11 @@ locals {
             v.custom_policy_statements,
             "{{BUCKET_ID}}", local.bucket_names[k]
           ),
-          "{{BUCKET_ARN}}", "arn:aws:s3:::${local.bucket_names[k]}"
+          "{{BUCKET_ARN}}", "arn:${local.partition}:s3:::${local.bucket_names[k]}"
         ),
-        "{{ACCOUNT_ID}}", data.aws_caller_identity.current.account_id
+        "{{ACCOUNT_ID}}", local.account_id
       ),
-      "{{REGION}}", data.aws_region.current.region
+      "{{REGION}}", local.region
     ) : null
   }
 }

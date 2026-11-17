@@ -9,11 +9,14 @@
 
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   for_each = {
-    for k, v in var.buckets :
+    for k, v in local.buckets :
     k => v if length(v.lifecycle_rules) > 0
   }
 
   bucket = aws_s3_bucket.this[each.key].id
+
+  # Minimum object size eligible for transitions (null keeps the AWS default)
+  transition_default_minimum_object_size = each.value.lifecycle_transition_default_minimum_object_size
 
   # Dynamic rule blocks - one for each lifecycle rule defined
   dynamic "rule" {
@@ -26,19 +29,21 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       # -----------------------------------------------------------------------
       # Filter Block
       # -----------------------------------------------------------------------
-      # Filters determine which objects the rule applies to
-      # Can filter by prefix, tags, object size, or combinations
+      # Filters determine which objects the rule applies to.
+      # - 0 criteria  -> empty filter (whole bucket)
+      # - 1 criterion -> simple prefix / tag / object size argument
+      # - 2+ criteria (including 2+ tags) -> "and" block
       # IMPORTANT: AWS Provider requires a filter block (even if empty)
 
       filter {
-        # Use "and" block when multiple filter criteria are specified
+        # Use "and" block when more than one criterion (or more than one tag) is set
         dynamic "and" {
           for_each = (
-            (rule.value.filter_tags != null ||
-              rule.value.filter_object_size_greater_than != null ||
-            rule.value.filter_object_size_less_than != null) &&
-            rule.value.filter_prefix != null
-          ) ? [1] : []
+            (rule.value.filter_prefix != null ? 1 : 0) +
+            (rule.value.filter_tags != null ? length(rule.value.filter_tags) : 0) +
+            (rule.value.filter_object_size_greater_than != null ? 1 : 0) +
+            (rule.value.filter_object_size_less_than != null ? 1 : 0)
+          ) > 1 ? [1] : []
 
           content {
             prefix                   = rule.value.filter_prefix
@@ -72,10 +77,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
           rule.value.filter_object_size_greater_than == null
         ) ? rule.value.filter_object_size_less_than : null
 
-        # Simple tag filter (when no other criteria)
+        # Simple single-tag filter (when no other criteria)
         dynamic "tag" {
           for_each = (
             rule.value.filter_tags != null &&
+            try(length(rule.value.filter_tags), 0) == 1 &&
             rule.value.filter_prefix == null &&
             rule.value.filter_object_size_greater_than == null &&
             rule.value.filter_object_size_less_than == null
@@ -169,4 +175,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       }
     }
   }
+
+  # Lifecycle rules on versioned buckets must be applied after versioning
+  depends_on = [aws_s3_bucket_versioning.this]
 }

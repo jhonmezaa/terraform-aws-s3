@@ -10,7 +10,10 @@ resource "aws_s3_bucket_inventory" "this" {
   bucket = aws_s3_bucket.this[each.value.bucket_key].id
   name   = each.key
 
-  # Inventory reports are placed in this bucket
+  # Whether the inventory configuration is active
+  enabled = each.value.enabled
+
+  # Object versions to include: All or Current
   included_object_versions = each.value.included_object_versions
 
   # Schedule: Daily or Weekly
@@ -28,6 +31,7 @@ resource "aws_s3_bucket_inventory" "this" {
       format     = each.value.destination_format
       bucket_arn = each.value.destination_bucket_arn
       prefix     = each.value.destination_prefix
+      account_id = each.value.destination_account_id
 
       # Optional: encrypt inventory reports with SSE-S3 or SSE-KMS
       dynamic "encryption" {

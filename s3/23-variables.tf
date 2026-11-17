@@ -15,8 +15,9 @@ variable "buckets" {
     # -------------------------------------------------------------------------
     # Basic Configuration
     # -------------------------------------------------------------------------
-    force_destroy       = optional(bool, false) # Allow deletion with objects
-    object_lock_enabled = optional(bool, false) # Enable object locking
+    name                = optional(string, null) # Explicit bucket name (overrides the generated name)
+    force_destroy       = optional(bool, false)  # Allow deletion with objects
+    object_lock_enabled = optional(bool, false)  # Enable object locking
 
     # -------------------------------------------------------------------------
     # Versioning
@@ -35,6 +36,8 @@ variable "buckets" {
     # -------------------------------------------------------------------------
     # Advanced Lifecycle Rules
     # -------------------------------------------------------------------------
+    lifecycle_transition_default_minimum_object_size = optional(string, null) # all_storage_classes_128K or varies_by_storage_class (null = AWS default)
+
     lifecycle_rules = optional(map(object({
       enabled = optional(bool, true)
 
@@ -276,8 +279,14 @@ variable "buckets" {
     attach_elb_log_policy    = optional(bool, false)  # Allow ELB log delivery
     attach_lb_log_policy     = optional(bool, false)  # Alias for attach_elb_log_policy
     attach_cloudtrail_policy = optional(bool, false)  # Allow CloudTrail log delivery
-    attach_waf_log_policy    = optional(bool, false)  # Allow WAF log delivery
+    attach_waf_log_policy    = optional(bool, false)  # Allow WAF log delivery (delivery.logs.amazonaws.com)
     custom_policy_statements = optional(string, null) # Custom policy JSON
+
+    attach_lb_log_delivery_policy             = optional(bool, false) # Allow NLB/ALB log delivery via delivery.logs.amazonaws.com
+    attach_access_log_delivery_policy         = optional(bool, false) # Allow S3 server access log delivery (logging.s3.amazonaws.com)
+    attach_require_latest_tls_policy          = optional(bool, false) # Deny requests using TLS < 1.2
+    attach_deny_unencrypted_object_uploads    = optional(bool, false) # Deny PutObject without SSE header
+    attach_deny_ssec_encrypted_object_uploads = optional(bool, false) # Deny PutObject using SSE-C
 
     # -------------------------------------------------------------------------
     # Public Access Block
@@ -373,6 +382,24 @@ variable "buckets" {
     error_message = "object_lock_config must be provided when object_lock_enabled is true."
   }
 
+  # Validation: Explicit bucket name must follow S3 naming rules
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      v.name == null ? true : can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", v.name))
+    ])
+    error_message = "name debe tener entre 3 y 63 caracteres, solo minúsculas, números, puntos y guiones, y empezar y terminar con letra o número."
+  }
+
+  # Validation: Lifecycle transition minimum object size
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      v.lifecycle_transition_default_minimum_object_size == null ? true : contains(["all_storage_classes_128K", "varies_by_storage_class"], v.lifecycle_transition_default_minimum_object_size)
+    ])
+    error_message = "lifecycle_transition_default_minimum_object_size debe ser 'all_storage_classes_128K' o 'varies_by_storage_class'."
+  }
+
   # Validation: Encryption type must be valid
   validation {
     condition = alltrue([
@@ -390,11 +417,21 @@ variable "buckets" {
 variable "account_name" {
   description = "Account name for resource naming (e.g., 'prod', 'dev', 'staging')"
   type        = string
+
+  validation {
+    condition     = length(var.account_name) >= 1 && length(var.account_name) <= 32 && can(regex("^[a-z0-9-]+$", var.account_name))
+    error_message = "account_name debe tener entre 1 y 32 caracteres y solo puede contener letras minúsculas, números y guiones."
+  }
 }
 
 variable "project_name" {
   description = "Project name for resource naming (e.g., 'myapp', 'website')"
   type        = string
+
+  validation {
+    condition     = length(var.project_name) >= 1 && length(var.project_name) <= 32 && can(regex("^[a-z0-9-]+$", var.project_name))
+    error_message = "project_name debe tener entre 1 y 32 caracteres y solo puede contener letras minúsculas, números y guiones."
+  }
 }
 
 variable "region_prefix" {
