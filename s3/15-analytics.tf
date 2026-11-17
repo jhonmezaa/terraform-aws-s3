@@ -16,7 +16,7 @@ resource "aws_s3_bucket_analytics_configuration" "this" {
   # Analyzes objects to determine optimal storage class transitions
 
   dynamic "storage_class_analysis" {
-    for_each = each.value.export_destination_bucket_arn != null ? [1] : []
+    for_each = each.value.storage_class_analysis_data_export_enabled && each.value.export_destination_bucket_arn != null ? [1] : []
 
     content {
       data_export {

@@ -4,8 +4,10 @@
 # Manages bucket policies with support for:
 # - TLS/HTTPS enforcement (security default)
 # - ELB/ALB/NLB access logging
+# - S3 server access log delivery
 # - CloudTrail log delivery
 # - WAF log delivery
+# - TLS 1.2+ and upload encryption guardrails
 # - Custom policy statements
 
 # -----------------------------------------------------------------------------
@@ -14,10 +16,7 @@
 # Merges multiple policy types into a single policy document
 
 data "aws_iam_policy_document" "combined" {
-  for_each = {
-    for k, v in var.buckets :
-    k => v if v.create_bucket_policy || v.attach_elb_log_policy || v.attach_lb_log_policy || v.attach_cloudtrail_policy || v.attach_waf_log_policy || v.custom_policy_statements != null
-  }
+  for_each = local.buckets_with_any_policy
 
   # ---------------------------------------------------------------------------
   # TLS Enforcement Policy
@@ -55,13 +54,14 @@ data "aws_iam_policy_document" "combined" {
   }
 
   # ---------------------------------------------------------------------------
-  # ELB/ALB/NLB Log Delivery Policy
+  # ELB/ALB Log Delivery Policy
   # ---------------------------------------------------------------------------
-  # Allows ELB service account to write access logs to bucket
-  # Required for Application Load Balancer, Network Load Balancer, Classic Load Balancer logs
+  # Allows Elastic Load Balancing to write access logs to the bucket.
+  # - Regions created before August 2022: regional ELB service account
+  # - Regions created after August 2022: logdelivery.elasticloadbalancing service principal
 
   dynamic "statement" {
-    for_each = each.value.attach_elb_log_policy || each.value.attach_lb_log_policy ? [1] : []
+    for_each = (each.value.attach_elb_log_policy || each.value.attach_lb_log_policy) && local.elb_service_account_arn != null ? [1] : []
 
     content {
       sid    = "AllowELBLogDelivery"
@@ -69,7 +69,7 @@ data "aws_iam_policy_document" "combined" {
 
       principals {
         type        = "AWS"
-        identifiers = [data.aws_elb_service_account.this[0].arn]
+        identifiers = [local.elb_service_account_arn]
       }
 
       actions = [
@@ -84,7 +84,7 @@ data "aws_iam_policy_document" "combined" {
 
   # Additional statement for ELB to check bucket ACL
   dynamic "statement" {
-    for_each = each.value.attach_elb_log_policy || each.value.attach_lb_log_policy ? [1] : []
+    for_each = (each.value.attach_elb_log_policy || each.value.attach_lb_log_policy) && local.elb_service_account_arn != null ? [1] : []
 
     content {
       sid    = "AllowELBLogDeliveryAclCheck"
@@ -92,7 +92,7 @@ data "aws_iam_policy_document" "combined" {
 
       principals {
         type        = "AWS"
-        identifiers = [data.aws_elb_service_account.this[0].arn]
+        identifiers = [local.elb_service_account_arn]
       }
 
       actions = [
@@ -102,6 +102,147 @@ data "aws_iam_policy_document" "combined" {
       resources = [
         aws_s3_bucket.this[each.key].arn,
       ]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = each.value.attach_elb_log_policy || each.value.attach_lb_log_policy ? [1] : []
+
+    content {
+      sid    = "AllowELBLogDeliveryServicePrincipal"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # NLB (and ALB via log delivery service) Log Delivery Policy
+  # ---------------------------------------------------------------------------
+  # Network Load Balancer access logs are delivered by delivery.logs.amazonaws.com
+
+  dynamic "statement" {
+    for_each = each.value.attach_lb_log_delivery_policy ? [1] : []
+
+    content {
+      sid    = "AlbNlbLogDeliveryWrite"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+
+      condition {
+        test     = "StringEquals"
+        variable = "s3:x-amz-acl"
+        values   = ["bucket-owner-full-control"]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = each.value.attach_lb_log_delivery_policy ? [1] : []
+
+    content {
+      sid    = "AlbNlbLogDeliveryAclCheck"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:GetBucketAcl",
+        "s3:ListBucket",
+      ]
+
+      resources = [
+        aws_s3_bucket.this[each.key].arn,
+      ]
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # S3 Server Access Log Delivery Policy
+  # ---------------------------------------------------------------------------
+  # Allows the S3 logging service to write server access logs into this bucket
+  # (required when the target bucket uses BucketOwnerEnforced, where the
+  # log-delivery-write ACL cannot be used)
+
+  dynamic "statement" {
+    for_each = each.value.attach_access_log_delivery_policy ? [1] : []
+
+    content {
+      sid    = "AWSAccessLogDeliveryWrite"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["logging.s3.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = each.value.attach_access_log_delivery_policy ? [1] : []
+
+    content {
+      sid    = "AWSAccessLogDeliveryAclCheck"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["logging.s3.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:GetBucketAcl",
+      ]
+
+      resources = [
+        aws_s3_bucket.this[each.key].arn,
+      ]
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+      }
     }
   }
 
@@ -132,9 +273,9 @@ data "aws_iam_policy_document" "combined" {
       ]
 
       condition {
-        test     = "StringEquals"
+        test     = "ArnLike"
         variable = "aws:SourceArn"
-        values   = ["arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/*"]
+        values   = ["arn:${local.partition}:cloudtrail:${local.region}:${local.account_id}:trail/*"]
       }
     }
   }
@@ -166,9 +307,9 @@ data "aws_iam_policy_document" "combined" {
       }
 
       condition {
-        test     = "StringEquals"
+        test     = "ArnLike"
         variable = "aws:SourceArn"
-        values   = ["arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/*"]
+        values   = ["arn:${local.partition}:cloudtrail:${local.region}:${local.account_id}:trail/*"]
       }
     }
   }
@@ -176,8 +317,9 @@ data "aws_iam_policy_document" "combined" {
   # ---------------------------------------------------------------------------
   # WAF Log Delivery Policy
   # ---------------------------------------------------------------------------
-  # Allows AWS WAF to write web ACL logs to bucket
-  # Required for AWS WAF logging
+  # Allows AWS WAF (via the CloudWatch Logs delivery service) to write web ACL
+  # logs to the bucket. NOTE: AWS WAF requires the bucket name to start with
+  # "aws-waf-logs-" (use the per-bucket `name` override).
 
   dynamic "statement" {
     for_each = each.value.attach_waf_log_policy ? [1] : []
@@ -188,7 +330,7 @@ data "aws_iam_policy_document" "combined" {
 
       principals {
         type        = "Service"
-        identifiers = ["logging.s3.amazonaws.com"]
+        identifiers = ["delivery.logs.amazonaws.com"]
       }
 
       actions = [
@@ -201,8 +343,20 @@ data "aws_iam_policy_document" "combined" {
 
       condition {
         test     = "StringEquals"
+        variable = "s3:x-amz-acl"
+        values   = ["bucket-owner-full-control"]
+      }
+
+      condition {
+        test     = "StringEquals"
         variable = "aws:SourceAccount"
-        values   = [data.aws_caller_identity.current.account_id]
+        values   = [local.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:${local.partition}:logs:*:${local.account_id}:*"]
       }
     }
   }
@@ -216,7 +370,7 @@ data "aws_iam_policy_document" "combined" {
 
       principals {
         type        = "Service"
-        identifiers = ["logging.s3.amazonaws.com"]
+        identifiers = ["delivery.logs.amazonaws.com"]
       }
 
       actions = [
@@ -230,7 +384,110 @@ data "aws_iam_policy_document" "combined" {
       condition {
         test     = "StringEquals"
         variable = "aws:SourceAccount"
-        values   = [data.aws_caller_identity.current.account_id]
+        values   = [local.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:${local.partition}:logs:*:${local.account_id}:*"]
+      }
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Require TLS 1.2+
+  # ---------------------------------------------------------------------------
+
+  dynamic "statement" {
+    for_each = each.value.attach_require_latest_tls_policy ? [1] : []
+
+    content {
+      sid    = "DenyOutdatedTLS"
+      effect = "Deny"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = [
+        "s3:*",
+      ]
+
+      resources = [
+        aws_s3_bucket.this[each.key].arn,
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+
+      condition {
+        test     = "NumericLessThan"
+        variable = "s3:TlsVersion"
+        values   = ["1.2"]
+      }
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Deny object uploads without a server-side encryption header
+  # ---------------------------------------------------------------------------
+
+  dynamic "statement" {
+    for_each = each.value.attach_deny_unencrypted_object_uploads ? [1] : []
+
+    content {
+      sid    = "DenyUnencryptedObjectUploads"
+      effect = "Deny"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+
+      condition {
+        test     = "Null"
+        variable = "s3:x-amz-server-side-encryption"
+        values   = ["true"]
+      }
+    }
+  }
+
+  # ---------------------------------------------------------------------------
+  # Deny SSE-C encrypted object uploads
+  # ---------------------------------------------------------------------------
+
+  dynamic "statement" {
+    for_each = each.value.attach_deny_ssec_encrypted_object_uploads ? [1] : []
+
+    content {
+      sid    = "DenySSECEncryptedObjectUploads"
+      effect = "Deny"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = [
+        "s3:PutObject",
+      ]
+
+      resources = [
+        "${aws_s3_bucket.this[each.key].arn}/*",
+      ]
+
+      condition {
+        test     = "Null"
+        variable = "s3:x-amz-server-side-encryption-customer-algorithm"
+        values   = ["false"]
       }
     }
   }
@@ -256,11 +513,12 @@ data "aws_iam_policy_document" "combined" {
 # Applies the combined policy document to the S3 bucket
 
 resource "aws_s3_bucket_policy" "this" {
-  for_each = {
-    for k, v in var.buckets :
-    k => v if v.create_bucket_policy || v.attach_elb_log_policy || v.attach_lb_log_policy || v.attach_cloudtrail_policy || v.attach_waf_log_policy || v.custom_policy_statements != null
-  }
+  for_each = local.buckets_with_any_policy
 
   bucket = aws_s3_bucket.this[each.key].id
   policy = data.aws_iam_policy_document.combined[each.key].json
+
+  # Chain bucket -> public access block -> policy to avoid
+  # "A conflicting conditional operation is currently in progress"
+  depends_on = [aws_s3_bucket_public_access_block.this]
 }

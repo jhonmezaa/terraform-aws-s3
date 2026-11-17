@@ -18,14 +18,13 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 # -----------------------------------------------------------------------------
-# ELB Service Account
+# AWS Partition
 # -----------------------------------------------------------------------------
-# Used for ELB/ALB/NLB log delivery bucket policies
-# Only created when at least one bucket has ELB log policy attached
+# Used to build partition-aware ARNs (aws, aws-cn, aws-us-gov)
 
-data "aws_elb_service_account" "this" {
-  count = length([
-    for k, v in var.buckets :
-    k if v.attach_elb_log_policy || v.attach_lb_log_policy
-  ]) > 0 ? 1 : 0
-}
+data "aws_partition" "current" {}
+
+# NOTE: data "aws_elb_service_account" was replaced by the static
+# local.elb_service_accounts map (21-locals.tf). The data source fails in
+# regions launched after August 2022, which only support the
+# logdelivery.elasticloadbalancing.amazonaws.com service principal.

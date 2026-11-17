@@ -5,15 +5,7 @@
 # Supports SNS topics, SQS queues, Lambda functions, and EventBridge
 
 resource "aws_s3_bucket_notification" "this" {
-  for_each = {
-    for k, v in var.buckets :
-    k => v if v.notifications != null && (
-      length(try(v.notifications.sns_topics, {})) > 0 ||
-      length(try(v.notifications.sqs_queues, {})) > 0 ||
-      length(try(v.notifications.lambda_functions, {})) > 0 ||
-      try(v.notifications.enable_eventbridge, false)
-    )
-  }
+  for_each = local.buckets_with_notifications
 
   bucket = aws_s3_bucket.this[each.key].id
 

@@ -12,6 +12,16 @@ output "bucket_ids" {
   value       = { for k, v in aws_s3_bucket.this : k => v.id }
 }
 
+output "bucket_names" {
+  description = "Map of bucket keys to bucket names (known at plan time)"
+  value       = local.bucket_names
+}
+
+output "bucket_tags" {
+  description = "Map of bucket keys to the tags applied to each bucket"
+  value       = { for k, v in aws_s3_bucket.this : k => v.tags }
+}
+
 output "bucket_arns" {
   description = "Map of bucket keys to bucket ARNs"
   value       = { for k, v in aws_s3_bucket.this : k => v.arn }
@@ -226,8 +236,9 @@ output "object_lock_configuration" {
   value = {
     for k, v in aws_s3_bucket_object_lock_configuration.this :
     k => {
-      mode = try(tolist(v.rule)[0].default_retention[0].mode, null)
-      days = try(tolist(v.rule)[0].default_retention[0].days, null)
+      mode  = try(tolist(v.rule)[0].default_retention[0].mode, null)
+      days  = try(tolist(v.rule)[0].default_retention[0].days, null)
+      years = try(tolist(v.rule)[0].default_retention[0].years, null)
     }
   }
 }
@@ -315,6 +326,14 @@ output "metrics_configs_count" {
 # -----------------------------------------------------------------------------
 # Policy Outputs
 # -----------------------------------------------------------------------------
+
+output "bucket_policies" {
+  description = "Map of bucket keys to the bucket policy JSON attached by the module"
+  value = {
+    for k, v in aws_s3_bucket_policy.this :
+    k => v.policy
+  }
+}
 
 output "bucket_policy_enabled" {
   description = "Map of bucket keys to bucket policy status"
