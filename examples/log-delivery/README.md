@@ -5,7 +5,7 @@ Demonstrates S3 buckets configured to receive logs from various AWS services wit
 ## Buckets Created
 
 ### 1. ELB/ALB/NLB Logs (`elb-logs`)
-- **Policy**: ELB service account write access
+- **Policy**: ELB service account (pre-Aug-2022 regions) + `logdelivery.elasticloadbalancing.amazonaws.com` (`attach_elb_log_policy`) and `delivery.logs.amazonaws.com` for NLB (`attach_lb_log_delivery_policy`)
 - **Retention**: 90 days
 - **Lifecycle**: STANDARD → STANDARD_IA (30 days) → Expire
 - **Use Case**: Load balancer access logs
@@ -18,12 +18,18 @@ Demonstrates S3 buckets configured to receive logs from various AWS services wit
 - **Use Case**: API audit logs
 
 ### 3. WAF Logs (`waf-logs`)
-- **Policy**: WAF logging service write access
+- **Name**: explicit `name = "aws-waf-logs-..."` (AWS WAF requires the `aws-waf-logs-` prefix)
+- **Policy**: `delivery.logs.amazonaws.com` write access (`attach_waf_log_policy`)
 - **Retention**: 30 days
 - **Lifecycle**: Expire after 30 days
 - **Use Case**: Web Application Firewall logs
 
-### 4. Application Logs (`app-logs`)
+### 4. S3 Server Access Logs (`access-logs`)
+- **Policy**: `logging.s3.amazonaws.com` write access (`attach_access_log_delivery_policy`)
+- **Retention**: 90 days
+- **Use Case**: Target bucket for `aws_s3_bucket_logging` (works with `BucketOwnerEnforced`)
+
+### 5. Application Logs (`app-logs`)
 - **Policy**: TLS enforcement + Custom cross-account policy (using placeholders)
 - **Retention**: 1 year
 - **Lifecycle**: STANDARD → STANDARD_IA (7d) → GLACIER (30d) → Expire (1yr)

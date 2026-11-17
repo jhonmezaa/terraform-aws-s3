@@ -3,17 +3,6 @@
 # =============================================================================
 # Demonstrates cross-region replication for disaster recovery and compliance
 
-terraform {
-  required_version = "~> 1.3"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
-
 provider "aws" {
   alias  = "primary"
   region = var.primary_region
@@ -115,11 +104,12 @@ module "primary_bucket" {
       enable_encryption = true
       encryption_type   = "AES256"
 
-      # Replication configuration (Schema V1 - Basic)
-      # Note: AWS S3 has two replication schemas:
-      #   - Schema V1 (basic): Single rule, no priority, no delete_marker_replication
-      #   - Schema V2 (advanced): Multiple rules with priority, delete_marker, metrics, RTC
-      # This example uses Schema V1 for maximum compatibility across all AWS accounts
+      # Replication configuration
+      # The module selects the replication schema per rule:
+      #   - Schema V1: rule without filter and without delete marker replication
+      #   - Schema V2: rule with filter_prefix/filter_tags or
+      #     delete_marker_replication_enabled = true (priority and
+      #     delete_marker_replication are then sent automatically)
       enable_replication = true
       replication_config = {
         role_arn = aws_iam_role.replication.arn
@@ -127,20 +117,17 @@ module "primary_bucket" {
         rules = {
           replicate_all = {
             enabled = true
-            # priority removed - not supported in schema V1
-            # priority = 1
 
             destination_bucket        = module.replica_bucket.bucket_arns["destination"]
             destination_storage_class = "STANDARD"
 
-            # Schema V1 limitations:
-            delete_marker_replication_enabled = false # Not supported in schema V1
-            metrics_enabled                   = false # Not supported in schema V1
-            replication_time_control_enabled  = false # Not supported in schema V1
+            delete_marker_replication_enabled = false
+            metrics_enabled                   = false
+            replication_time_control_enabled  = false
           }
 
-          # Second rule commented out - multiple rules require schema V2
-          # which is not supported in all AWS accounts/regions
+          # Multiple rules require schema V2: give every rule a filter and a
+          # unique priority (and a filter on the first rule as well)
           # replicate_docs = {
           #   enabled       = true
           #   priority      = 2
