@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.0] - 2026-11-17
+
+### Added
+
+- Per-bucket `name` to override the generated bucket name (validated against S3 naming rules); a plan-time precondition enforces the S3 limit of 3-63 characters for every bucket name
+- Bucket policy options: `attach_lb_log_delivery_policy` (NLB/ALB via `delivery.logs.amazonaws.com`), `attach_access_log_delivery_policy` (S3 server access logs via `logging.s3.amazonaws.com`), `attach_require_latest_tls_policy` (deny TLS < 1.2), `attach_deny_unencrypted_object_uploads` and `attach_deny_ssec_encrypted_object_uploads`
+- ELB log delivery now also grants `logdelivery.elasticloadbalancing.amazonaws.com`, so ALB/CLB logs work in regions launched after August 2022
+- Replication: `priority`, `delete_marker_replication_enabled`, `destination_account_id`, `destination_replica_kms_key_id` and `destination_access_control_translation` are now applied (they were accepted but ignored); rules with a filter or delete marker replication use the V2 schema automatically
+- `lifecycle_transition_default_minimum_object_size` per bucket
+- Object lock `rule_default_retention_years` is now applied (used when `rule_default_retention_days` is null)
+- Outputs `bucket_names` (known at plan time), `bucket_tags` and `bucket_policies`; `object_lock_configuration` now includes `years`
+- Validation of `account_name` and `project_name` (1-32 characters, `^[a-z0-9-]+$`)
+- `ManagedBy = "Terraform"` tag on every bucket
+- `examples/log-delivery`: S3 server access log bucket and WAF bucket named `aws-waf-logs-*`
+
+### Fixed
+
+- `create = false` failed at plan with `Invalid index` because child resources iterated `var.buckets`; every resource now iterates the effective bucket map
+- Lifecycle filters: two or more tags, or tags/object size without prefix, produced an invalid filter (`tag` list with more than one element) or an empty filter that applied the rule to the whole bucket; they now use an `and` block
+- CloudTrail policy used `StringEquals` with a wildcard `aws:SourceArn` (`trail/*`), which never matches; it now uses `ArnLike`
+- WAF log policy granted `logging.s3.amazonaws.com` (S3 server access logging) instead of `delivery.logs.amazonaws.com`, so WAF could not deliver logs
+- Replication rules with `filter_prefix`/`filter_tags` were sent without `DeleteMarkerReplication`, which AWS requires for filtered (V2) rules
+- Inventory `enabled` and `destination_account_id`, and analytics `storage_class_analysis_data_export_enabled`, were ignored
+- `data.aws_elb_service_account` replaced by a static regional map, as the data source fails in regions without a legacy ELB account
+- Partition-aware ARNs (`aws_partition`) in policies and placeholders
+- Bucket policy now depends on the public access block, and lifecycle configuration on versioning, to avoid conflicting S3 operations
+
+### Changed
+
+- Examples: provider and Terraform constraints moved from `main.tf` to `versions.tf`
+- Stop tracking `examples/simple/tfplan`; ignore `*tfplan*` and `CLAUDE.md`
+- README: `source` uses `git::https://github.com/jhonmezaa/terraform-aws-s3.git//s3?ref=v2.2.0`, inputs table matches the code (`buckets` is required, `use_region_prefix` documented), replication and policy sections updated
+
+### Upgrade notes
+
+- `Name` and `ManagedBy` tags are now applied last: a `Name` set in a bucket's `tags` is replaced by the bucket name. `ManagedBy = "Terraform"` is added to all buckets (in-place tag update, no recreation).
+- `attach_waf_log_policy` now grants `delivery.logs.amazonaws.com`. If you used it to receive **S3 server access logs**, switch to `attach_access_log_delivery_policy = true`. AWS WAF requires bucket names starting with `aws-waf-logs-`: use the new `name` argument (setting `name` on an existing bucket renames it and forces recreation).
+- Existing replication rules with a filter now include `delete_marker_replication { status = "Disabled" }` and `priority` (in-place update). Rules without filter are unchanged.
+- `account_name`/`project_name` with uppercase letters, underscores or more than 32 characters are now rejected (they already produced invalid S3 bucket names).
+- No resource is recreated by this release with unchanged inputs.
+
 ## [v2.1.5] - 2026-10-27
 
 ### Changed

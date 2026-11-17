@@ -22,7 +22,7 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 
 ### Access & Security
 
-- ✅ **Bucket Policies**: TLS enforcement, ELB/CloudTrail/WAF log delivery
+- ✅ **Bucket Policies**: TLS enforcement, TLS 1.2+, upload-encryption guardrails, ELB/NLB/S3 access log/CloudTrail/WAF log delivery
 - ✅ **Custom Policies with Placeholders**: Auto-replacement of {{BUCKET_ID}}, {{BUCKET_ARN}}, {{ACCOUNT_ID}}, {{REGION}}
 - ✅ **Object Ownership Controls**: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter
 - ✅ **ACL Support**: Canned ACLs when needed
@@ -42,7 +42,7 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 
 ### Advanced Features
 
-- ✅ **Cross-Region Replication**: Schema V1 (basic) - single rule, maximum compatibility
+- ✅ **Cross-Region Replication**: Schema V1 or V2 selected per rule (filters, priority, delete markers, cross-account, KMS replicas, metrics, RTC)
 - ✅ **Transfer Acceleration**: CloudFront edge location optimization
 - ✅ **Object Lock**: COMPLIANCE and GOVERNANCE modes
 - ✅ **Intelligent-Tiering**: Automatic cost optimization
@@ -59,7 +59,7 @@ Production-ready Terraform module for creating and managing AWS S3 buckets with 
 
 ```hcl
 module "s3_buckets" {
-  source = "./s3"
+  source = "git::https://github.com/jhonmezaa/terraform-aws-s3.git//s3?ref=v2.2.0"
 
   create       = true
   account_name = "prod"
@@ -82,7 +82,7 @@ module "s3_buckets" {
   }
 
   tags_common = {
-    ManagedBy = "Terraform"
+    Environment = "production"
   }
 }
 ```
@@ -261,28 +261,18 @@ buckets = {
 
 Placeholders are replaced at apply time automatically. See [log-delivery example](./examples/log-delivery/) for complete implementation.
 
-### Replication Schema V1 Limitations
+### Replication Schema (V1 / V2)
 
-⚠️ **Important:** This module uses S3 Replication **Schema V1** (basic) for maximum compatibility across all AWS accounts.
+The module selects the S3 replication schema **per rule**:
 
-**What works (Schema V1):**
+| Rule settings | Schema | Sent to AWS |
+| --- | --- | --- |
+| No `filter_prefix`/`filter_tags` and `delete_marker_replication_enabled = false` | V1 | no `filter`, no `priority`, no `delete_marker_replication` |
+| `filter_prefix` or `filter_tags` set, or `delete_marker_replication_enabled = true` | V2 | `filter` (empty if no criteria), `priority`, `delete_marker_replication` |
 
-- ✅ Single replication rule per bucket
-- ✅ Cross-Region Replication (CRR) or Same-Region Replication (SRR)
-- ✅ Destination bucket and storage class configuration
-- ✅ Encryption support (SSE-S3 or SSE-KMS)
-- ✅ Prefix filtering (one rule)
+AWS requires `DeleteMarkerReplication` whenever a `Filter` is present, and rejects `Priority`/`DeleteMarkerReplication` without a `Filter`; the module now sends them together. With several V2 rules, set a **unique** `priority` on each one. Replication Time Control requires `metrics_enabled = true`.
 
-**What doesn't work (Schema V2 - not universally available):**
-
-- ❌ Multiple replication rules with priority
-- ❌ Delete marker replication
-- ❌ Replication metrics
-- ❌ Replication Time Control (RTC)
-
-**Why Schema V1?** During extensive testing, we found that Schema V2 features (`priority`, `delete_marker_replication`) cause `InvalidRequest` API errors even when properly configured, indicating they're not universally available across all AWS accounts/regions.
-
-**Example:**
+Per-rule destination options: `destination_storage_class`, `destination_account_id`, `destination_access_control_translation = { owner = "Destination" }`, `destination_replica_kms_key_id` (combine with `source_selection_criteria_sse_kms_encrypted_objects = true`).
 
 ```hcl
 buckets = {
@@ -291,21 +281,20 @@ buckets = {
     replication_config = {
       role_arn = aws_iam_role.replication.arn
       rules = {
-        replicate-all = {
-          enabled = true
-          # priority NOT supported in Schema V1
-          destination_bucket = "arn:aws:s3:::destination-bucket"
-          destination_storage_class = "STANDARD_IA"
-          delete_marker_replication_enabled = false  # Must be false
+        documents = {
+          priority                          = 1
+          filter_prefix                     = "documents/"
+          delete_marker_replication_enabled = true
+          destination_bucket                = "arn:aws:s3:::destination-bucket"
+          destination_storage_class         = "STANDARD_IA"
         }
-        # Second rule NOT supported - only one rule allowed in Schema V1
       }
     }
   }
 }
 ```
 
-See [with-replication example](./examples/with-replication/) for working implementation.
+See [with-replication example](./examples/with-replication/) for a working implementation.
 
 ### Event Notification Filter Requirements
 
@@ -367,33 +356,51 @@ For complete input documentation, see [variables.tf](./s3/23-variables.tf).
 
 ### Key Variables
 
-| Name            | Description                                    | Type          | Default | Required |
-| --------------- | ---------------------------------------------- | ------------- | ------- | -------- |
-| `create`        | Whether to create resources                    | `bool`        | `true`  | no       |
-| `account_name`  | Account name for bucket naming                 | `string`      | n/a     | yes      |
-| `project_name`  | Project name for bucket naming                 | `string`      | n/a     | yes      |
-| `region_prefix` | Region prefix override (auto-detected if null) | `string`      | `null`  | no       |
-| `buckets`       | Map of bucket configurations                   | `map(object)` | `{}`    | no       |
-| `tags_common`   | Common tags for all buckets                    | `map(string)` | `{}`    | no       |
+| Name                | Description                                              | Type          | Default | Required |
+| ------------------- | -------------------------------------------------------- | ------------- | ------- | -------- |
+| `account_name`      | Account name for bucket naming (1-32 chars, `^[a-z0-9-]+$`) | `string`   | n/a     | yes      |
+| `project_name`      | Project name for bucket naming (1-32 chars, `^[a-z0-9-]+$`) | `string`   | n/a     | yes      |
+| `buckets`           | Map of bucket configurations                             | `map(object)` | n/a     | yes      |
+| `create`            | Whether to create resources                              | `bool`        | `true`  | no       |
+| `region_prefix`     | Region prefix override (auto-detected if null)           | `string`      | `null`  | no       |
+| `use_region_prefix` | Include the region prefix in bucket names                | `bool`        | `true`  | no       |
+| `tags_common`       | Common tags for all buckets                              | `map(string)` | `{}`    | no       |
 
 ### Bucket Configuration Object
 
-Each bucket in the `buckets` map supports 100+ configuration options. Key options:
+Each bucket in the `buckets` map supports many options. Key options:
 
-| Option                       | Description                                | Type           | Default    |
-| ---------------------------- | ------------------------------------------ | -------------- | ---------- |
-| `force_destroy`              | Allow bucket deletion with objects         | `bool`         | `false`    |
-| `enable_versioning`          | Enable versioning                          | `bool`         | `true`     |
-| `enable_encryption`          | Enable encryption                          | `bool`         | `true`     |
-| `encryption_type`            | SSE algorithm (AES256 or aws:kms)          | `string`       | `"AES256"` |
-| `enable_public_access_block` | Block public access                        | `bool`         | `true`     |
-| `create_bucket_policy`       | Create TLS enforcement policy              | `bool`         | `true`     |
-| `lifecycle_rules`            | Map of lifecycle rules                     | `map(object)`  | `{}`       |
-| `cors_rules`                 | List of CORS rules                         | `list(object)` | `[]`       |
-| `enable_website`             | Enable website hosting                     | `bool`         | `false`    |
-| `enable_replication`         | Enable replication                         | `bool`         | `false`    |
-| `enable_acceleration`        | Enable transfer acceleration               | `bool`         | `false`    |
-| `object_lock_enabled`        | Enable object lock (immutable at creation) | `bool`         | `false`    |
+| Option                                            | Description                                                   | Type           | Default                 |
+| ------------------------------------------------- | ------------------------------------------------------------- | -------------- | ----------------------- |
+| `name`                                            | Explicit bucket name (overrides the generated name)           | `string`       | `null`                  |
+| `force_destroy`                                   | Allow bucket deletion with objects                            | `bool`         | `false`                 |
+| `enable_versioning`                               | Enable versioning                                             | `bool`         | `true`                  |
+| `enable_encryption`                               | Enable encryption                                             | `bool`         | `true`                  |
+| `encryption_type`                                 | SSE algorithm (AES256 or aws:kms)                             | `string`       | `"AES256"`              |
+| `enable_public_access_block`                      | Block public access                                           | `bool`         | `true`                  |
+| `object_ownership`                                | Object ownership                                              | `string`       | `"BucketOwnerEnforced"` |
+| `create_bucket_policy`                            | Deny non-TLS requests (`aws:SecureTransport`)                 | `bool`         | `true`                  |
+| `attach_require_latest_tls_policy`                | Deny requests with TLS < 1.2                                  | `bool`         | `false`                 |
+| `attach_deny_unencrypted_object_uploads`          | Deny `PutObject` without SSE header                           | `bool`         | `false`                 |
+| `attach_deny_ssec_encrypted_object_uploads`       | Deny `PutObject` with SSE-C                                   | `bool`         | `false`                 |
+| `attach_elb_log_policy` / `attach_lb_log_policy`  | ALB/CLB access logs (ELB account + ELB log delivery service)  | `bool`         | `false`                 |
+| `attach_lb_log_delivery_policy`                   | NLB access logs (`delivery.logs.amazonaws.com`)               | `bool`         | `false`                 |
+| `attach_access_log_delivery_policy`               | S3 server access logs (`logging.s3.amazonaws.com`)            | `bool`         | `false`                 |
+| `attach_cloudtrail_policy`                        | CloudTrail log delivery                                       | `bool`         | `false`                 |
+| `attach_waf_log_policy`                           | WAF log delivery (`delivery.logs.amazonaws.com`)              | `bool`         | `false`                 |
+| `custom_policy_statements`                        | Extra policy JSON (supports placeholders)                     | `string`       | `null`                  |
+| `lifecycle_rules`                                 | Map of lifecycle rules                                        | `map(object)`  | `{}`                    |
+| `lifecycle_transition_default_minimum_object_size`| `all_storage_classes_128K` or `varies_by_storage_class`       | `string`       | `null` (AWS default)    |
+| `cors_rules`                                      | List of CORS rules                                            | `list(object)` | `[]`                    |
+| `enable_website`                                  | Enable website hosting                                        | `bool`         | `false`                 |
+| `enable_logging` / `logging_config`               | Server access logging to a target bucket                      | `bool`/`object`| `false` / `null`        |
+| `enable_replication` / `replication_config`       | Replication                                                   | `bool`/`object`| `false` / `null`        |
+| `enable_acceleration`                             | Enable transfer acceleration                                  | `bool`         | `false`                 |
+| `object_lock_enabled`                             | Enable object lock (immutable at creation)                    | `bool`         | `false`                 |
+| `object_lock_config`                              | Default retention (`mode` + `days` or `years`)                | `object`       | `null`                  |
+| `inventory_configs` / `analytics_configs` / `metrics_configs` / `intelligent_tiering_configs` | Reporting and tiering        | `map(object)`  | `{}`                    |
+| `notifications`                                   | SNS/SQS/Lambda/EventBridge notifications                      | `object`       | `null`                  |
+| `tags`                                            | Bucket-specific tags                                          | `map(string)`  | `{}`                    |
 
 See [complete example](./examples/complete/) for all available options.
 
@@ -403,6 +410,7 @@ See [complete example](./examples/complete/) for all available options.
 
 | Name                     | Description                                 |
 | ------------------------ | ------------------------------------------- |
+| `bucket_names`           | Map of bucket keys to names (known at plan) |
 | `bucket_ids`             | Map of bucket keys to IDs (names)           |
 | `bucket_arns`            | Map of bucket keys to ARNs                  |
 | `bucket_domain_names`    | Map of bucket keys to domain names          |
@@ -410,6 +418,8 @@ See [complete example](./examples/complete/) for all available options.
 | `versioning_enabled`     | Map of bucket keys to versioning status     |
 | `encryption_enabled`     | Map of bucket keys to encryption status     |
 | `acceleration_endpoints` | Map of bucket keys to accelerated endpoints |
+| `bucket_tags`            | Map of bucket keys to bucket tags           |
+| `bucket_policies`        | Map of bucket keys to attached policy JSON  |
 | `buckets_summary`        | Comprehensive summary of all configurations |
 
 See [outputs.tf](./s3/24-outputs.tf) for all available outputs.
@@ -424,6 +434,12 @@ Buckets are automatically named using the pattern:
 
 **Example:** `ause1-s3-prod-myapp-data`
 
+- With `use_region_prefix = false` the region prefix is omitted: `s3-prod-myapp-data`.
+- A per-bucket `name` overrides the generated name (e.g. WAF requires `aws-waf-logs-*`).
+- Names are checked at plan time against the S3 limit of 3-63 characters.
+
+Every bucket gets the tags `merge(tags_common, { BucketKey, AccountName, ProjectName }, tags, { Name = <bucket name>, ManagedBy = "Terraform" })`.
+
 ### Region Prefix Auto-Detection
 
 The module automatically detects the AWS region and applies the appropriate prefix:
@@ -435,7 +451,9 @@ The module automatically detects the AWS region and applies the appropriate pref
 | us-west-1 | usw1   | eu-west-3      | euw3   |
 | us-west-2 | usw2   | ap-southeast-1 | apse1  |
 
-27 regions supported. Override with `region_prefix` variable if needed.
+29 regions supported (unknown regions resolve to `unknown`). Override with `region_prefix` if needed.
+
+> Note: this module keeps its historical short codes (`usw1`, `euw1`, …), which differ from the `ausw1`/`euwe1` codes used by other `jhonmezaa` modules. Changing them would rename (and therefore recreate) existing buckets, so they are kept for backward compatibility.
 
 ## Security Defaults
 
