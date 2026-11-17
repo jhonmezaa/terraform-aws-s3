@@ -4,18 +4,8 @@
 # Demonstrates buckets configured for receiving logs from AWS services:
 # - ELB/ALB/NLB access logs
 # - CloudTrail audit logs
-# - WAF logs
-
-terraform {
-  required_version = "~> 1.3"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
+# - WAF logs (bucket name must start with "aws-waf-logs-")
+# - S3 server access logs
 
 provider "aws" {
   region = var.aws_region
@@ -38,9 +28,10 @@ module "s3_buckets" {
       enable_encryption = true
       encryption_type   = "AES256"
 
-      # Attach ELB log delivery policy
-      create_bucket_policy  = true
-      attach_elb_log_policy = true
+      # Attach ELB (ALB/CLB) and NLB log delivery policies
+      create_bucket_policy          = true
+      attach_elb_log_policy         = true
+      attach_lb_log_delivery_policy = true
 
       # Lifecycle: expire old logs after 90 days
       lifecycle_rules = {
@@ -118,7 +109,10 @@ module "s3_buckets" {
     }
 
     # WAF Logs
+    # AWS WAF only delivers logs to buckets whose name starts with "aws-waf-logs-",
+    # so the generated name is overridden with an explicit one.
     waf-logs = {
+      name                = "aws-waf-logs-${var.account_name}-${var.project_name}"
       force_destroy       = true
       object_lock_enabled = false
 
@@ -146,6 +140,33 @@ module "s3_buckets" {
 
       tags = {
         LogType = "waf"
+      }
+    }
+
+    # S3 Server Access Logs (target bucket for aws_s3_bucket_logging)
+    # With BucketOwnerEnforced the log-delivery-write ACL is not allowed,
+    # so log delivery is granted through the bucket policy.
+    access-logs = {
+      force_destroy = true
+
+      enable_versioning = false
+      enable_encryption = true
+      encryption_type   = "AES256"
+
+      create_bucket_policy              = true
+      attach_access_log_delivery_policy = true
+
+      lifecycle_rules = {
+        expire_access_logs = {
+          enabled         = true
+          expiration_days = 90
+        }
+      }
+
+      object_ownership = "BucketOwnerEnforced"
+
+      tags = {
+        LogType = "s3-access"
       }
     }
 

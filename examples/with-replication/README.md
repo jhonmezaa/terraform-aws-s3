@@ -1,6 +1,6 @@
 # S3 Cross-Region Replication Example
 
-Demonstrates automatic cross-region replication for disaster recovery and compliance using S3 Replication Schema V1 (basic).
+Demonstrates automatic cross-region replication for disaster recovery and compliance using a single replication rule (S3 Replication Schema V1).
 
 ## Features
 
@@ -13,28 +13,16 @@ Demonstrates automatic cross-region replication for disaster recovery and compli
 
 ## Schema V1 vs Schema V2
 
-AWS S3 has two replication configuration schemas:
+AWS S3 has two replication configuration schemas. Since v2.2.0 the module selects the schema **per rule**:
 
-### Schema V1 (Basic) - Used in this example
-- ✅ Single replication rule
-- ✅ Basic destination configuration
-- ✅ Storage class selection
-- ✅ Prefix filtering (optional)
-- ❌ No priority attribute
-- ❌ No delete marker replication
-- ❌ No replication metrics
-- ❌ No Replication Time Control (RTC)
-- ✅ **Works in all AWS accounts/regions**
+| Rule settings | Schema | What the module sends |
+| --- | --- | --- |
+| No `filter_prefix`/`filter_tags` and `delete_marker_replication_enabled = false` | V1 | No `filter`, no `priority`, no `delete_marker_replication` |
+| `filter_prefix` or `filter_tags` set, or `delete_marker_replication_enabled = true` | V2 | `filter` (empty if no criteria), `priority`, `delete_marker_replication` |
 
-### Schema V2 (Advanced) - Not used
-- ✅ Multiple replication rules
-- ✅ Priority attribute
-- ✅ Delete marker replication
-- ✅ Replication metrics
-- ✅ Replication Time Control (RTC)
-- ❌ **Not supported in all AWS accounts** (causes API errors)
+The previous "Schema V2 is not available" errors (`Priority cannot be used for this version...`) happen when `priority`/`delete_marker_replication` are sent **without** a `filter` block. AWS requires `DeleteMarkerReplication` whenever a `Filter` is present, so the module now sends both together.
 
-**Why V1?** During testing, Schema V2 features (priority, delete_marker_replication) caused `InvalidRequest` errors even when properly configured, indicating they're not universally available. Schema V1 provides maximum compatibility.
+This example uses a single V1 rule (no filter).
 
 ## Architecture
 
@@ -135,15 +123,9 @@ Both buckets must have:
 - `replica_bucket_arn` - Destination bucket ARN
 - `replication_role_arn` - IAM role ARN for replication
 
-## Limitations (Schema V1)
+## Multiple rules / advanced features
 
-- ❌ Cannot have multiple replication rules (only 1 rule supported)
-- ❌ No priority attribute (not needed with single rule)
-- ❌ Delete markers are not replicated
-- ❌ No replication metrics in CloudWatch
-- ❌ No Replication Time Control (RTC) SLA
-
-If you need these advanced features, you would need Schema V2, which may not be available in all AWS accounts. Contact AWS Support to enable Schema V2 if required.
+To use several rules, delete marker replication, metrics or Replication Time Control, give each rule a filter (or set `delete_marker_replication_enabled = true`) and a **unique** `priority`. RTC requires `metrics_enabled = true`.
 
 ## Cleanup
 
@@ -186,13 +168,9 @@ terraform destroy
 
 ### Common Errors
 
-**Error: Priority cannot be used**
-- Cause: Trying to use Schema V2 features
-- Solution: Remove priority attribute (already done in this example)
-
-**Error: DeleteMarkerReplication cannot be used**
-- Cause: Schema V2 feature not supported
-- Solution: Set to false (already done in this example)
+**Error: Priority cannot be used / DeleteMarkerReplication cannot be used**
+- Cause: V2 attributes sent without a `filter` block (module versions < v2.2.0)
+- Solution: Upgrade to v2.2.0+; the module sends them only together with a filter
 
 **Error: ReplicationConfigurationNotFoundError**
 - Cause: Replication config not applied yet
